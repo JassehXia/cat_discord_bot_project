@@ -22,7 +22,7 @@ export default {
         const title = getTitle(level);
 
         // Progress bar
-        const barLength = 20;
+        const barLength = 10;
         const percent = xp / xpRequired;
         const filled = Math.round(percent * barLength);
         const empty = barLength - filled;

@@ -127,6 +127,21 @@ export default {
                     if (found) found.quantity++;
                     else user.cats.push({ cat: cat._id, model: 'EventCat', quantity: 1, personality: trait || undefined });
                 }
+
+                //Update Quests
+                // Daily Quest Updates
+
+                // Premium discovers (Rare/Epic/Legendary)
+                user.dailyPremiumDiscovers += results.length; // count all pulls, not just 1
+
+                user.dailyQuests.forEach(q => {
+                    if (q.field === "dailyPremiumDiscovers" && !q.completed) {
+                        q.progress = user.dailyPremiumDiscovers;
+                        if (q.progress >= q.target) q.completed = true;
+                    }
+                });
+
+
                 await user.save();
 
                 const list = results.map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**` +

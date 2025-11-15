@@ -114,6 +114,31 @@ export default {
             if (trait && (trait.type === 'xp' || trait.type === 'both')) xpEarned = Math.floor(xpEarned * trait.multiplier);
             const leveledUp = addXP(user, xpEarned);
 
+            //Quest Updates
+            // Quest Updates
+            user.dailyDiscovers += 1;
+
+            // ✔ Discover quests
+            user.dailyQuests.forEach(q => {
+                if (q.field === "dailyDiscovers" && !q.completed) {
+                    q.progress = user.dailyDiscovers;
+                    if (q.progress >= q.target) q.completed = true;
+                }
+            });
+
+            // ✔ Catnip quests
+            user.dailyCatnip += catnipEarned;
+
+            user.dailyQuests.forEach(q => {
+                if (q.field === "dailyCatnip" && !q.completed) {
+                    q.progress = user.dailyCatnip;
+                    if (q.progress >= q.target) q.completed = true;
+                }
+            });
+
+
+
+
             await user.save();
             cooldowns.set(discordId, now);
 
