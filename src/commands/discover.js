@@ -1,4 +1,3 @@
-// src/commands/discover.js
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import User from '../models/User.js';
 import Cat from '../models/Cat.js';
@@ -89,14 +88,19 @@ export default {
             const catsOfRarity = await Cat.find({ rarity });
             const cat = catsOfRarity[Math.floor(Math.random() * catsOfRarity.length)];
 
+            // Personality trait
+            const trait = rollPersonality();
+
             // Add cat to user's collection
             let existing = user.cats.find(c => c.cat && c.cat._id.equals(cat._id));
             if (existing) existing.quantity++;
-            else user.cats.push({ cat: cat._id, model: 'Cat', quantity: 1 });
-
-            // Personality trait
-            const trait = rollPersonality();
-            if (trait) cat.personality = trait;
+            else
+                user.cats.push({
+                    cat: cat._id,
+                    model: 'Cat',
+                    quantity: 1,
+                    personality: trait || undefined
+                });
 
             // Catnip calculation
             let catnipEarned = Math.floor(catnipRewards[rarity] * getCatnipMultiplier(user.level));
@@ -118,7 +122,7 @@ export default {
             if (currentEvent?.name === 'Snowstorm') frames = snowfallFrames(5, 30, 6, ['❄️']);
             await animateEmbed(interaction, `🎄 ${username} discovers a cat...`, frames, rarityColors[rarity]);
 
-            // Build embed
+            // Embed
             const embed = new EmbedBuilder()
                 .setTitle(`🎄 You discovered a cat! ${rarityEmojis[rarity]}`)
                 .setColor(rarityColors[rarity])
@@ -134,7 +138,6 @@ export default {
             if (currentEvent) embed.addFields({ name: '🌟 Current Event', value: `${currentEvent.name} — ${currentEvent.description}` });
 
             await interaction.editReply({ embeds: [embed] });
-
         } catch (err) {
             console.error('/discover error:', err);
             interaction.editReply('❌ Something went wrong.');

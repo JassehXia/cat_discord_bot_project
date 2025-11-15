@@ -34,7 +34,6 @@ export default {
             const discordId = interaction.user.id;
             const username = interaction.user.username;
 
-            // Populate dynamically using refPath in schema
             const user = await User.findOne({ discordId }).populate('cats.cat');
 
             if (!user || user.cats.length === 0) {
@@ -43,21 +42,17 @@ export default {
                 );
             }
 
-            // Remove null entries
             user.cats = user.cats.filter(c => c.cat);
-
             if (user.cats.length === 0) {
                 return await interaction.editReply(
                     `🐾 ${username}, your collection is empty. Use **/discover** to get new cats!`
                 );
             }
 
-            // Sort by rarity (Legendary → Common)
             const sortedCats = user.cats.sort(
                 (a, b) => rarityOrder.indexOf(a.cat.rarity) - rarityOrder.indexOf(b.cat.rarity)
             );
 
-            // Pagination
             const pageSize = 10;
             let page = 0;
             const totalPages = Math.ceil(sortedCats.length / pageSize);
@@ -66,7 +61,6 @@ export default {
                 const start = page * pageSize;
                 const currentCats = sortedCats.slice(start, start + pageSize);
 
-                // Determine highest rarity on this page for color
                 let highestRarity = 'Common';
                 currentCats.forEach(c => {
                     if (rarityOrder.indexOf(c.cat.rarity) < rarityOrder.indexOf(highestRarity)) {
@@ -82,9 +76,13 @@ export default {
                 currentCats.forEach(c => {
                     const flair = rarityFlair[c.cat.rarity] || { emoji: '🐱', symbol: '' };
                     const eventTag = c.model === 'EventCat' ? '🎉' : '';
+                    let value = `Quantity: **x${c.quantity}**`;
+                    if (c.personality) {
+                        value += `\n🌟 Personality: **${c.personality.tierName} ${c.personality.name}** (${c.personality.type})`;
+                    }
                     embed.addFields({
                         name: `${eventTag}${flair.emoji} **${c.cat.name}** — *${c.cat.rarity}* ${flair.symbol}`,
-                        value: `Quantity: **x${c.quantity}**`,
+                        value,
                         inline: false
                     });
                 });
@@ -92,7 +90,6 @@ export default {
                 return embed;
             };
 
-            // Pagination buttons
             const createRow = () => new ActionRowBuilder().addComponents(
                 new ButtonBuilder()
                     .setCustomId('prev')

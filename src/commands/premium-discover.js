@@ -1,4 +1,3 @@
-// src/commands/premium-discover.js
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import User from '../models/User.js';
 import EventCat from '../models/EventCat.js';
@@ -19,15 +18,11 @@ const rarityEmojis = {
     Legendary: '🌈✨'
 };
 
-// XP rewards
 const xpRewards = { Rare: 20, Epic: 50, Legendary: 100 };
-
-// Costs
 const SINGLE_COST = 20;
 const MULTI_COST = 200;
 const MULTI_COUNT = 11;
 
-// Rarity distribution
 const rarities = [
     { type: 'Rare', chance: 0.85 },
     { type: 'Epic', chance: 0.12 },
@@ -50,13 +45,10 @@ export default {
         const { id: discordId, username } = interaction.user;
 
         try {
-            // Fetch or create user
             let user = await User.findOne({ discordId }).populate('cats.cat');
-            if (!user) {
-                user = await User.create({ discordId, username, cats: [], catnip: 0, xp: 0, level: 1 });
-            }
+            if (!user) user = await User.create({ discordId, username, cats: [], catnip: 0, xp: 0, level: 1 });
 
-            // Menu embed
+            // Menu
             const menuEmbed = new EmbedBuilder()
                 .setTitle('🎁 Premium Event Discover')
                 .setDescription(
@@ -90,28 +82,26 @@ export default {
                 let levelUps = 0;
 
                 for (let j = 0; j < pullCount; j++) {
-                    // Determine rarity
                     const roll = Math.random();
                     let rarity = 'Rare';
                     let cumulative = 0;
-                    for (const r of rarities) { cumulative += r.chance; if (roll < cumulative) { rarity = r.type; break; } }
+                    for (const r of rarities) {
+                        cumulative += r.chance;
+                        if (roll < cumulative) { rarity = r.type; break; }
+                    }
 
-                    // Pick cat
                     const pool = await EventCat.find({ eventRarity: eventRarityMap[rarity] });
                     const cat = pool[Math.floor(Math.random() * pool.length)];
 
-                    // Personality trait
                     const trait = rollPersonality();
                     if (trait) cat.personality = trait;
 
-                    // XP calculation
                     let xpEarned = xpRewards[rarity];
                     if (trait && (trait.type === 'xp' || trait.type === 'both')) xpEarned = Math.floor(xpEarned * trait.multiplier);
                     if (addXP(user, xpEarned)) levelUps++;
 
                     results.push({ cat, rarity, trait, xpEarned });
 
-                    // Animation
                     const frames = snowfallFrames(2, 25, 6, rarity);
                     await animateEmbed(i, `🎁 Pull ${j + 1}`, frames, rarityColors[rarity]);
 
@@ -119,9 +109,11 @@ export default {
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle(`🎉 Pull ${j + 1}`)
-                                .setDescription(`${rarityEmojis[rarity]} **${cat.name}**` +
+                                .setDescription(
+                                    `${rarityEmojis[rarity]} **${cat.name}**` +
                                     (trait ? `\n🌟 Personality: **${trait.tierName} ${trait.name}**` : '') +
-                                    `\n⭐ XP Earned: **${xpEarned}**`)
+                                    `\n⭐ XP Earned: **${xpEarned}**`
+                                )
                                 .setColor(rarityColors[rarity])
                         ]
                     });
@@ -130,14 +122,13 @@ export default {
                 }
 
                 // Add cats to inventory
-                for (const { cat } of results) {
+                for (const { cat, trait } of results) {
                     const found = user.cats.find(c => c.cat.equals(cat._id));
                     if (found) found.quantity++;
-                    else user.cats.push({ cat: cat._id, model: 'EventCat', quantity: 1 });
+                    else user.cats.push({ cat: cat._id, model: 'EventCat', quantity: 1, personality: trait || undefined });
                 }
                 await user.save();
 
-                // Final summary embed
                 const list = results.map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**` +
                     (r.trait ? ` — 🌟 ${r.trait.tierName} ${r.trait.name}` : '')).join('\n');
 
@@ -152,7 +143,6 @@ export default {
 
                 await i.editReply({ embeds: [finalEmbed] });
             });
-
         } catch (err) {
             console.error('premium-discover error:', err);
             interaction.editReply('❌ Something went wrong.');

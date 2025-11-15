@@ -1,44 +1,28 @@
 // src/utils/rollPersonality.js
-const baseTraits = [
-    { name: 'Playful', type: 'catnip' },
-    { name: 'Curious', type: 'xp' },
-    { name: 'Loyal', type: 'both' },
-    { name: 'Mischievous', type: 'catnip' },
-    { name: 'Wise', type: 'xp' },
-    { name: 'Energetic', type: 'both' }
-];
-
-const traitTiers = [
-    { tier: 'Minor', multiplier: 1.1, chance: 0.5 },
-    { tier: 'Moderate', multiplier: 1.2, chance: 0.35 },
-    { tier: 'Major', multiplier: 1.3, chance: 0.15 }
-];
 
 /**
- * Roll a personality trait for a cat
- * @returns {Object|null} Trait object or null if no trait
+ * Rolls a random personality trait for a cat.
+ * Returns null if no personality is rolled.
  */
+
+const traits = [
+    { name: 'Curious', type: 'xp', tierName: 'Minor', multiplier: 1.1 },
+    { name: 'Playful', type: 'catnip', tierName: 'Minor', multiplier: 1.1 },
+    { name: 'Lucky', type: 'both', tierName: 'Moderate', multiplier: 1.25 },
+    { name: 'Energetic', type: 'xp', tierName: 'Moderate', multiplier: 1.25 },
+    { name: 'Generous', type: 'catnip', tierName: 'Major', multiplier: 1.5 },
+    { name: 'Legendary', type: 'both', tierName: 'Major', multiplier: 1.5 }
+];
+
+// Chance that a cat gets a personality trait
+const PERSONALITY_CHANCE = 0.3; // 30%
+
 export function rollPersonality() {
-    if (Math.random() > 0.2) return null; // 20% chance
+    if (Math.random() > PERSONALITY_CHANCE) return null;
 
-    const trait = baseTraits[Math.floor(Math.random() * baseTraits.length)];
+    // Pick a random trait
+    const trait = traits[Math.floor(Math.random() * traits.length)];
 
-    // Roll tier
-    const tierRoll = Math.random();
-    let cumulative = 0;
-    let tier = traitTiers[0];
-    for (const t of traitTiers) {
-        cumulative += t.chance;
-        if (tierRoll < cumulative) {
-            tier = t;
-            break;
-        }
-    }
-
-    return {
-        name: trait.name,
-        type: trait.type,
-        tierName: tier.tier,
-        multiplier: tier.multiplier
-    };
+    // Return a new object so we don't accidentally modify the original
+    return { ...trait };
 }
