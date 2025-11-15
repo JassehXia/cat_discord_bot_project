@@ -1,10 +1,11 @@
+// src/commands/premium-discover.js
 import { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
 import User from '../models/User.js';
 import EventCat from '../models/EventCat.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
+import { addXP } from '../utils/addXP.js'; // ⬅ NEW
 
-// Embed colors
 const rarityColors = {
     Rare: '#3261CD',
     Epic: '#A200FF',
@@ -17,11 +18,11 @@ const rarityEmojis = {
     Legendary: '🌈✨'
 };
 
-// Snowflake variants for animation by rarity
-const snowflakeVariants = {
-    Rare: ['*', '❄', '.', '•'],
-    Epic: ['⭐', '✦', '✧', '🌟'],
-    Legendary: ['✨', '💫', '🌈', '🌟']
+// XP rewards
+const xpRewards = {
+    Rare: 20,
+    Epic: 50,
+    Legendary: 100
 };
 
 const SINGLE_COST = 20;
@@ -40,146 +41,128 @@ const eventRarityMap = {
     Legendary: 'Festive-LR'
 };
 
-// Custom function to generate frames using rarity-specific symbols
-function customSnowfallFrames(frameCount, width = 25, height = 6, rarity = 'Rare') {
-    const chars = snowflakeVariants[rarity] || ['*', '❄', '.', '•'];
-    const frames = [];
-
-    for (let i = 0; i < frameCount; i++) {
-        let frame = '';
-        for (let h = 0; h < height; h++) {
-            let line = '';
-            for (let w = 0; w < width; w++) {
-                line += Math.random() < 0.15
-                    ? chars[Math.floor(Math.random() * chars.length)]
-                    : ' ';
-            }
-            frame += line + '\n';
-        }
-        frames.push(frame);
-    }
-
-    return frames;
-}
-
 export default {
     data: new SlashCommandBuilder()
         .setName('premium-discover')
-        .setDescription('Open the premium discover (Rare+ guaranteed from Event Cats)'),
+        .setDescription('Open the premium discover (Rare+ guaranteed)'),
 
     async execute(interaction) {
-        await interaction.deferReply({ ephemeral: false });
+        await interaction.deferReply();
 
         const discordId = interaction.user.id;
         const username = interaction.user.username;
 
         try {
             let user = await User.findOne({ discordId }).populate('cats.cat');
-            if (!user) user = await User.create({ discordId, username, cats: [], catnip: 0 });
+            if (!user)
+                user = await User.create({
+                    discordId,
+                    username,
+                    cats: [],
+                    catnip: 0,
+                    xp: 0,
+                    level: 1
+                });
 
-            // Pull selection embed
+            // Menu
             const embed = new EmbedBuilder()
                 .setTitle('🎁 Premium Event Discover')
                 .setDescription(
-                    `Choose your premium pull:\n\n` +
-                    `🎯 **Single Pull:** 1 Rare+ Event Cat for **${SINGLE_COST} Catnip**\n` +
-                    `🎯 **Multi Pull:** 11 Rare+ Event Cats for **${MULTI_COST} Catnip**`
+                    `🎯 **Single Pull:** 1 Rare+ Event Cat — **${SINGLE_COST} Catnip**\n` +
+                    `🎯 **Multi Pull:** 11 Rare+ Event Cats — **${MULTI_COST} Catnip**`
                 )
                 .setColor('#FFD700');
 
-            const pullRow = new ActionRowBuilder()
-                .addComponents(
-                    new ButtonBuilder().setCustomId('single').setLabel('Single Pull').setStyle(ButtonStyle.Primary),
-                    new ButtonBuilder().setCustomId('multi').setLabel('Multi Pull').setStyle(ButtonStyle.Success)
-                );
+            const row = new ActionRowBuilder().addComponents(
+                new ButtonBuilder().setCustomId('single').setLabel('Single Pull').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('multi').setLabel('Multi Pull').setStyle(ButtonStyle.Success)
+            );
 
-            const message = await interaction.editReply({ embeds: [embed], components: [pullRow] });
-            const collector = message.createMessageComponentCollector({ time: 120000 });
+            const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+            const collector = msg.createMessageComponentCollector({ time: 120000 });
 
             collector.on('collect', async i => {
-                if (i.user.id !== discordId) return i.reply({ content: 'This is not your discover!', ephemeral: true });
+                if (i.user.id !== discordId) return i.reply({ content: 'Not your discover!', ephemeral: true });
                 await i.deferUpdate();
 
                 const pullCount = i.customId === 'single' ? 1 : MULTI_COUNT;
                 const cost = i.customId === 'single' ? SINGLE_COST : MULTI_COST;
 
-                if ((user.catnip || 0) < cost) {
+                if (user.catnip < cost)
                     return i.followUp({ content: `❌ Not enough Catnip! Need ${cost}.`, ephemeral: true });
-                }
 
                 user.catnip -= cost;
                 await user.save();
 
-                // Remove the pull buttons immediately
                 await i.editReply({ components: [] });
 
-                // Generate all pulls upfront
                 const results = [];
+                let levelUps = 0;
+
                 for (let j = 0; j < pullCount; j++) {
                     const roll = Math.random();
                     let rarity = 'Rare';
                     let cumulative = 0;
+
                     for (const r of rarities) {
                         cumulative += r.chance;
                         if (roll < cumulative) { rarity = r.type; break; }
                     }
 
-                    const catsOfRarity = await EventCat.find({ eventRarity: eventRarityMap[rarity] });
-                    if (!catsOfRarity.length) continue;
-                    const cat = catsOfRarity[Math.floor(Math.random() * catsOfRarity.length)];
+                    const pool = await EventCat.find({ eventRarity: eventRarityMap[rarity] });
+                    const cat = pool[Math.floor(Math.random() * pool.length)];
 
                     results.push({ cat, rarity });
-                }
 
-                // Animation loop (fast)
-                for (let j = 0; j < results.length; j++) {
-                    const { cat, rarity } = results[j];
-                    const frames = customSnowfallFrames(2, 25, 6, rarity); // 2 frames for faster animation
+                    // XP Logic
+                    const xpEarned = xpRewards[rarity];
+                    const leveledUp = addXP(user, xpEarned);
+                    if (leveledUp) levelUps++;
 
+                    // Animation
+                    const frames = snowfallFrames(2, 25, 6);
                     await animateEmbed(i, `🎁 Pull ${j + 1}`, frames, rarityColors[rarity]);
 
-                    // Reveal cat
-                    const revealEmbed = new EmbedBuilder()
-                        .setTitle(`🎉 Pull ${j + 1}`)
-                        .setDescription(`**${rarityEmojis[rarity]} ${cat.name}**`)
-                        .setColor(rarityColors[rarity])
-                        .setFooter({ text: `💰 Remaining Catnip: ${user.catnip}` });
+                    await i.editReply({
+                        embeds: [
+                            new EmbedBuilder()
+                                .setTitle(`🎉 Pull ${j + 1}`)
+                                .setDescription(`${rarityEmojis[rarity]} **${cat.name}**\n⭐ XP Earned: **${xpEarned}**`)
+                                .setColor(rarityColors[rarity])
+                        ]
+                    });
 
-                    await i.editReply({ embeds: [revealEmbed] });
-
-                    // Very short delay before next pull
                     await new Promise(res => setTimeout(res, 600));
                 }
 
-                // Add all pulls to user collection
+                // Add cats to inventory
                 for (const { cat } of results) {
-                    const existing = user.cats.find(c => c.cat.equals(cat._id));
-                    if (existing) {
-                        existing.quantity += 1;
-                    } else {
-                        user.cats.push({
-                            cat: cat._id,
-                            model: 'EventCat', // explicitly mark as EventCat
-                            quantity: 1
-                        });
-                    }
+                    const found = user.cats.find(c => c.cat.equals(cat._id));
+                    if (found) found.quantity++;
+                    else user.cats.push({ cat: cat._id, model: 'EventCat', quantity: 1 });
                 }
+
                 await user.save();
 
+                const list = results
+                    .map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**`)
+                    .join('\n');
 
-                // Final results list
-                const descriptionList = results.map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**`).join('\n');
                 const finalEmbed = new EmbedBuilder()
                     .setTitle(`🎉 Premium Discover Results!`)
-                    .setDescription(descriptionList + `\n\n💰 Remaining Catnip: ${user.catnip}`)
-                    .setColor('#FFD700');
+                    .setColor('#FFD700')
+                    .setDescription(
+                        `${list}\n\n` +
+                        (levelUps > 0 ? `🎉 **You leveled up ${levelUps} time(s)!** New Level: **${user.level}**\n\n` : ``) +
+                        `💰 Remaining Catnip: **${user.catnip}**`
+                    );
 
-                await i.editReply({ embeds: [finalEmbed], components: [] });
+                await i.editReply({ embeds: [finalEmbed] });
             });
 
         } catch (err) {
-            console.error('Error executing /premium-discover:', err);
-            await interaction.editReply({ content: '❌ Something went wrong!', ephemeral: true });
+            console.error('premium-discover error:', err);
+            interaction.editReply('❌ Something went wrong.');
         }
     }
 };

@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
             cat: {
                 type: mongoose.Schema.Types.ObjectId,
                 required: true,
-                refPath: 'cats.model' // dynamic reference
+                refPath: 'cats.model'
             },
             model: {
                 type: String,
@@ -19,7 +19,11 @@ const userSchema = new mongoose.Schema({
         }
     ],
     lastDiscoverAt: { type: Date, default: null },
-    catnip: { type: Number, default: 0 }
+    catnip: { type: Number, default: 0 },
+
+    // ⭐ NEW
+    xp: { type: Number, default: 0 },
+    level: { type: Number, default: 1 }
 });
 
 export default mongoose.models.User || mongoose.model('User', userSchema);

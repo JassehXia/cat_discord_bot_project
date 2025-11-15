@@ -4,6 +4,7 @@ import User from '../models/User.js';
 import Cat from '../models/Cat.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
+import { addXP } from '../utils/addXP.js'; // ⬅ NEW
 
 const rarityColors = {
     Common: '#A0A0A0',
@@ -29,7 +30,15 @@ const catnipRewards = {
     Legendary: 100
 };
 
-// Cooldown map
+// XP rewards for leveling
+const xpRewards = {
+    Common: 5,
+    Uncommon: 10,
+    Rare: 20,
+    Epic: 40,
+    Legendary: 80
+};
+
 const cooldowns = new Map();
 const COOLDOWN_MS = 15 * 1000;
 
@@ -50,18 +59,20 @@ export default {
         const remaining = COOLDOWN_MS - (now - lastUsed);
         if (remaining > 0) {
             const seconds = Math.ceil(remaining / 1000);
-            const totalBars = 10;
-            const filledBars = Math.round(totalBars * ((COOLDOWN_MS - remaining) / COOLDOWN_MS));
-            const bar = '❄️'.repeat(filledBars) + '⚪'.repeat(totalBars - filledBars);
-
-            return interaction.editReply(`🕒 Please wait ${seconds}s before discovering again.\n${bar}`);
+            return interaction.editReply(`🕒 Wait ${seconds}s before discovering again.`);
         }
 
         try {
-            // Load or create user
             let user = await User.findOne({ discordId }).populate('cats.cat');
             if (!user) {
-                user = await User.create({ discordId, username, cats: [], catnip: 0 });
+                user = await User.create({
+                    discordId,
+                    username,
+                    cats: [],
+                    catnip: 0,
+                    xp: 0,
+                    level: 1
+                });
             }
 
             // Determine rarity
@@ -73,9 +84,10 @@ export default {
                 { type: 'Legendary', chance: 0.01 }
             ];
 
-            const roll = Math.random();
             let rarity = 'Common';
+            const roll = Math.random();
             let cumulative = 0;
+
             for (const r of rarities) {
                 cumulative += r.chance;
                 if (roll < cumulative) {
@@ -84,58 +96,46 @@ export default {
                 }
             }
 
-            // Select a random cat from the regular pool
             const catsOfRarity = await Cat.find({ rarity });
-            if (!catsOfRarity.length) throw new Error(`No regular cats found for rarity ${rarity}`);
-
             const cat = catsOfRarity[Math.floor(Math.random() * catsOfRarity.length)];
-            if (!cat) throw new Error('Selected cat is null');
 
-            // Add cat to user collection safely
-            // Add cat to user collection safely
+            // Add cat to collection
             let existing = user.cats.find(c => c.cat && c.cat._id.equals(cat._id));
-            if (existing) {
-                existing.quantity += 1;
-            } else {
-                user.cats.push({
-                    cat: cat._id,
-                    model: 'Cat', // <-- THIS IS REQUIRED
-                    quantity: 1
-                });
-            }
+            if (existing) existing.quantity++;
+            else user.cats.push({ cat: cat._id, model: 'Cat', quantity: 1 });
 
-
-            // Award Catnip
-            const catnipEarned = catnipRewards[rarity] || 0;
+            // Catnip gain
+            const catnipEarned = catnipRewards[rarity];
             user.catnip += catnipEarned;
 
-            // Save user
-            await user.save();
+            // XP gain
+            const xpEarned = xpRewards[rarity];
+            const leveledUp = addXP(user, xpEarned);
 
+            await user.save();
             cooldowns.set(discordId, now);
 
-            // ❄️ Snowfall animation reveal
-            const frames = snowfallFrames(5, 30, 6); // shorter animation
-            await animateEmbed(interaction, `🎄 ${username} is discovering a cat! 🐾`, frames, rarityColors[rarity]);
+            // Animation
+            const frames = snowfallFrames(5, 30, 6);
+            await animateEmbed(interaction, `🎄 ${username} discovers a cat...`, frames, rarityColors[rarity]);
 
-            // Final reveal embed
+            // Final reveal
             const embed = new EmbedBuilder()
                 .setTitle(`🎄 You discovered a cat! ${rarityEmojis[rarity]}`)
+                .setColor(rarityColors[rarity])
                 .setDescription(
-                    `**${cat.name}** — ${cat.description}\n` +
-                    `You now have **${existing ? existing.quantity : 1}** of this cat.\n\n` +
-                    `🎁 Earned **${catnipEarned} Catnip**!\n` +
+                    `**${cat.name}** — ${cat.description}\n\n` +
+                    `🎁 Catnip Earned: **${catnipEarned}**\n` +
+                    `⭐ XP Earned: **${xpEarned}**\n\n` +
+                    (leveledUp ? `🎉 **LEVEL UP!** You are now **Level ${user.level}**!\n` : ``) +
                     `💰 Total Catnip: **${user.catnip}**`
-                )
-                .setColor(rarityColors[rarity]);
+                );
 
             await interaction.editReply({ embeds: [embed] });
 
         } catch (err) {
             console.error('/discover error:', err);
-            if (!interaction.replied) {
-                await interaction.editReply({ content: '❌ Something went wrong!', ephemeral: true });
-            }
+            interaction.editReply('❌ Something went wrong.');
         }
     }
 };
