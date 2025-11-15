@@ -2,6 +2,9 @@
 /* Refresh Commands */
 node src/deploy-commands.js
 
+/* Refresh Global Commands */
+node src/deploy-global-commands.js
+
 /* Seed Cats */
 node scripts\seed.js
 
