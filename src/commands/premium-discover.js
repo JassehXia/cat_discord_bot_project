@@ -121,9 +121,10 @@ export default {
                     const leveledUp = addXP(user, xpEarned);
                     if (leveledUp) levelUps++;
 
-                    // Animation
-                    const frames = snowfallFrames(2, 25, 6);
+                    // Animation with mixed particles
+                    const frames = snowfallFrames(2, 25, 6, rarity);
                     await animateEmbed(i, `🎁 Pull ${j + 1}`, frames, rarityColors[rarity]);
+
 
                     await i.editReply({
                         embeds: [

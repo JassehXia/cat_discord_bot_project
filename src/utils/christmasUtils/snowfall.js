@@ -1,15 +1,23 @@
 // utils/snowfall.js
 
-const SNOW_CHARS = ['*', '❄', '.', '•'];
+const BASE_PARTICLES = ['*', '❄', '.', '•'];
 
-// Generate a single frame of snowfall
-export function snowfallFrame(width = 25, height = 6) {
+const SPECIAL_PARTICLES = {
+    Rare: ['❄'],           // Mostly snow
+    Epic: ['✨'],           // Stars
+    Legendary: ['🌈', '⭐', '💫'] // Rainbows & sparkles
+};
+
+// Generate a single frame with mixed particles
+export function snowfallFrame(width = 25, height = 6, rarity = 'Common') {
+    const special = SPECIAL_PARTICLES[rarity] || [];
+    const chars = [...BASE_PARTICLES, ...special]; // mix base + special
     let frame = '';
     for (let h = 0; h < height; h++) {
         let line = '';
         for (let w = 0; w < width; w++) {
             line += Math.random() < 0.15
-                ? SNOW_CHARS[Math.floor(Math.random() * SNOW_CHARS.length)]
+                ? chars[Math.floor(Math.random() * chars.length)]
                 : ' ';
         }
         frame += line + '\n';
@@ -18,28 +26,10 @@ export function snowfallFrame(width = 25, height = 6) {
 }
 
 // Generate multiple frames for animation
-export function snowfallFrames(frameCount = 5, width = 25, height = 6) {
+export function snowfallFrames(frameCount = 5, width = 25, height = 6, rarity = 'Common') {
     const frames = [];
     for (let i = 0; i < frameCount; i++) {
-        let frame = '';
-        for (let h = 0; h < height; h++) {
-            let line = '';
-            for (let w = 0; w < width; w++) {
-                line += Math.random() < 0.15
-                    ? SNOW_CHARS[Math.floor(Math.random() * SNOW_CHARS.length)]
-                    : ' ';
-            }
-            if (i === 0 && h === 0) {
-                // Add sparkles for epic and legendary rarities
-                if (i === 0 && h === 0 && (i === 5 || i === 7)) {
-                    line = '✨'.repeat(width);
-                } else if (i === 0 && h === 0 && i > 5 && i < 10) {
-                    line = '✨'.repeat(width);
-                }
-            }
-            frame += line + '\n';
-        }
-        frames.push(frame);
+        frames.push(snowfallFrame(width, height, rarity));
     }
     return frames;
 }
