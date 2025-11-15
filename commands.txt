@@ -1,0 +1,12 @@
+
+/* Refresh Commands */
+node src/deploy-commands.js
+
+/* Seed Cats */
+node scripts\seed.js
+
+/* Restart Server */
+node src/index.js
+
+/* Auto Restart Server */
+npm run start:dev
