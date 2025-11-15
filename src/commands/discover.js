@@ -5,8 +5,8 @@ import Cat from '../models/Cat.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
 import { addXP } from '../utils/addXP.js';
-import { getCatnipMultiplier } from '../utils/levelTitles.js'; // ⬅ NEW
-
+import { getCatnipMultiplier } from '../utils/levelTitles.js';
+import { getCurrentEvent } from '../utils/eventManager/index.js';
 
 const rarityColors = {
     Common: '#A0A0A0',
@@ -32,7 +32,6 @@ const catnipRewards = {
     Legendary: 100
 };
 
-// XP rewards for leveling
 const xpRewards = {
     Common: 5,
     Uncommon: 10,
@@ -61,7 +60,10 @@ export default {
         const remaining = COOLDOWN_MS - (now - lastUsed);
         if (remaining > 0) {
             const seconds = Math.ceil(remaining / 1000);
-            return interaction.editReply(`🕒 Wait ${seconds}s before discovering again.`);
+            const totalBars = 10;
+            const filledBars = Math.round(totalBars * ((COOLDOWN_MS - remaining) / COOLDOWN_MS));
+            const bar = '❄️'.repeat(filledBars) + '⚪'.repeat(totalBars - filledBars);
+            return interaction.editReply(`🕒 Please wait ${seconds}s before discovering again.\n${bar}`);
         }
 
         try {
@@ -89,7 +91,6 @@ export default {
             let rarity = 'Common';
             const roll = Math.random();
             let cumulative = 0;
-
             for (const r of rarities) {
                 cumulative += r.chance;
                 if (roll < cumulative) {
@@ -107,10 +108,14 @@ export default {
             else user.cats.push({ cat: cat._id, model: 'Cat', quantity: 1 });
 
             // Catnip gain
-            const multiplier = getCatnipMultiplier(user.level); // 1 + 0.05 per title tier
-            const catnipEarned = Math.floor(catnipRewards[rarity] * multiplier);
-            user.catnip += catnipEarned;
+            let catnipEarned = Math.floor(catnipRewards[rarity] * getCatnipMultiplier(user.level));
 
+            // Apply global event multiplier
+            const currentEvent = getCurrentEvent();
+            if (currentEvent?.catnipMultiplier) {
+                catnipEarned = Math.floor(catnipEarned * currentEvent.catnipMultiplier);
+            }
+            user.catnip += catnipEarned;
 
             // XP gain
             const xpEarned = xpRewards[rarity];
@@ -120,7 +125,11 @@ export default {
             cooldowns.set(discordId, now);
 
             // Animation
-            const frames = snowfallFrames(5, 30, 6);
+            let frames = snowfallFrames(5, 30, 6);
+            if (currentEvent?.name === 'Snowstorm') {
+                frames = snowfallFrames(5, 30, 6, ['❄️']);
+            }
+
             await animateEmbed(interaction, `🎄 ${username} discovers a cat...`, frames, rarityColors[rarity]);
 
             // Final reveal
@@ -134,6 +143,13 @@ export default {
                     (leveledUp ? `🎉 **LEVEL UP!** You are now **Level ${user.level}**!\n` : ``) +
                     `💰 Total Catnip: **${user.catnip}**`
                 );
+
+            if (currentEvent) {
+                embed.addFields({
+                    name: '🌟 Current Event',
+                    value: `${currentEvent.name} — ${currentEvent.description}`
+                });
+            }
 
             await interaction.editReply({ embeds: [embed] });
 
