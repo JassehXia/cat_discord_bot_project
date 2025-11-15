@@ -31,7 +31,7 @@ const catnipRewards = {
 
 // Cooldown map
 const cooldowns = new Map();
-const COOLDOWN_MS = 60 * 1000;
+const COOLDOWN_MS = 15 * 1000;
 
 export default {
     data: new SlashCommandBuilder()
