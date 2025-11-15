@@ -96,7 +96,7 @@ Status: ${quest.completed ? "✅ Completed" : "🔸 In Progress"}`;
         await interaction.reply({
             embeds: [embed],
             components: [new ActionRowBuilder().addComponents(claimButton)],
-            ephemeral: true
+            ephemeral: false
         });
 
         // -----------------------------
@@ -115,13 +115,13 @@ Status: ${quest.completed ? "✅ Completed" : "🔸 In Progress"}`;
             const updatedUser = await User.findOne({ discordId: interaction.user.id });
 
             if (!updatedUser) {
-                return btn.reply({ content: "❌ User not found.", ephemeral: true });
+                return btn.reply({ content: "❌ User not found.", ephemeral: false });
             }
 
             const completedQuests = updatedUser.dailyQuests.filter(q => q.completed);
 
             if (completedQuests.length === 0) {
-                return btn.reply({ content: "❌ You haven't completed any quests yet!", ephemeral: true });
+                return btn.reply({ content: "❌ You haven't completed any quests yet!", ephemeral: false });
             }
 
             // Accumulate rewards
@@ -148,7 +148,7 @@ Status: ${quest.completed ? "✅ Completed" : "🔸 In Progress"}`;
             return btn.reply({
                 content: `🎉 **Rewards Claimed!**  
 You received **${totalCatnip} Catnip** and **${totalXp} XP**.`,
-                ephemeral: true
+                ephemeral: false
             });
         });
 
