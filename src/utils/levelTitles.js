@@ -23,11 +23,11 @@ export function getTitle(level) {
 
 /**
  * Calculate Catnip bonus multiplier based on title
- * +5% per title index
+ * +5% per title tier achieved
  * @param {number} level
  */
 export function getCatnipMultiplier(level) {
-    const index = levelTitles.findIndex(t => level < t.level);
-    const titleIndex = index === -1 ? levelTitles.length : index; // highest title if beyond max
+    const highestTitle = getTitle(level);
+    const titleIndex = levelTitles.findIndex(t => t.level === highestTitle.level);
     return 1 + titleIndex * 0.05; // 5% per title tier
 }

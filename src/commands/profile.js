@@ -51,7 +51,7 @@ export default {
 
         const embed = new EmbedBuilder()
             .setColor('#F7C873')
-            .setTitle(`${interaction.user.username}'s Profile — ${title}`) // <--- TITLE
+            .setTitle(`${interaction.user.username}'s Profile — ${title.title}`) // <--- TITLE
             .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
             .addFields(
                 { name: '⭐ Level', value: `${level}`, inline: true },

@@ -1,10 +1,9 @@
-// src/utils/eventManager/events.js
 export const events = [
     {
         name: "Snowstorm",
         description: "❄️ Snowstorm! +20% Catnip gains!",
         catnipMultiplier: 1.2,
-        durationMs: 30 * 60 * 30 // 1 hour
+        durationMs: 30 * 60 * 1000 // 30 minutes
     },
     {
         name: "Catnip Festival",
@@ -12,5 +11,4 @@ export const events = [
         catnipMultiplier: 1.5,
         durationMs: 10 * 60 * 1000 // 10 minutes
     }
-    // Add more events here
 ];
