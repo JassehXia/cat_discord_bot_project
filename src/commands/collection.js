@@ -75,7 +75,7 @@ export default {
 
                 currentCats.forEach(c => {
                     const flair = rarityFlair[c.cat.rarity] || { emoji: '🐱', symbol: '' };
-                    const eventTag = c.model === 'EventCat' ? '🎉' : '';
+                    const eventTag = c.model === 'EventCat' ? '❄️' : '';
                     let value = `Quantity: **x${c.quantity}**`;
                     if (c.personality) {
                         value += `\n🌟 Personality: **${c.personality.tierName} ${c.personality.name}** (${c.personality.type})`;
