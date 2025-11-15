@@ -4,7 +4,9 @@ import User from '../models/User.js';
 import Cat from '../models/Cat.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
-import { addXP } from '../utils/addXP.js'; // ⬅ NEW
+import { addXP } from '../utils/addXP.js';
+import { getCatnipMultiplier } from '../utils/levelTitles.js'; // ⬅ NEW
+
 
 const rarityColors = {
     Common: '#A0A0A0',
@@ -105,8 +107,10 @@ export default {
             else user.cats.push({ cat: cat._id, model: 'Cat', quantity: 1 });
 
             // Catnip gain
-            const catnipEarned = catnipRewards[rarity];
+            const multiplier = getCatnipMultiplier(user.level); // 1 + 0.05 per title tier
+            const catnipEarned = Math.floor(catnipRewards[rarity] * multiplier);
             user.catnip += catnipEarned;
+
 
             // XP gain
             const xpEarned = xpRewards[rarity];

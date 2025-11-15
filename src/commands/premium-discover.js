@@ -4,7 +4,9 @@ import User from '../models/User.js';
 import EventCat from '../models/EventCat.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
-import { addXP } from '../utils/addXP.js'; // ⬅ NEW
+import { addXP } from '../utils/addXP.js';
+import { getCatnipMultiplier } from '../utils/levelTitles.js'; // ⬅ NEW
+
 
 const rarityColors = {
     Rare: '#3261CD',
