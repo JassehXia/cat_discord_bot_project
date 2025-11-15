@@ -7,6 +7,7 @@ import { animateEmbed } from '../utils/animateEmbed.js';
 import { addXP } from '../utils/addXP.js';
 import { getCatnipMultiplier } from '../utils/levelTitles.js';
 import { getCurrentEvent } from '../utils/eventManager/index.js';
+import { rollPersonality } from '../utils/rollPersonality.js';
 
 const rarityColors = {
     Common: '#A0A0A0',
@@ -24,21 +25,8 @@ const rarityEmojis = {
     Legendary: '🌈✨'
 };
 
-const catnipRewards = {
-    Common: 5,
-    Uncommon: 10,
-    Rare: 25,
-    Epic: 50,
-    Legendary: 100
-};
-
-const xpRewards = {
-    Common: 5,
-    Uncommon: 10,
-    Rare: 20,
-    Epic: 40,
-    Legendary: 80
-};
+const catnipRewards = { Common: 5, Uncommon: 10, Rare: 25, Epic: 50, Legendary: 100 };
+const xpRewards = { Common: 5, Uncommon: 10, Rare: 20, Epic: 40, Legendary: 80 };
 
 const cooldowns = new Map();
 const COOLDOWN_MS = 15 * 1000;
@@ -50,11 +38,9 @@ export default {
 
     async execute(interaction) {
         await interaction.deferReply();
+        const { id: discordId, username } = interaction.user;
 
-        const discordId = interaction.user.id;
-        const username = interaction.user.username;
-
-        // Cooldown check
+        // Cooldown
         const now = Date.now();
         const lastUsed = cooldowns.get(discordId) || 0;
         const remaining = COOLDOWN_MS - (now - lastUsed);
@@ -67,6 +53,7 @@ export default {
         }
 
         try {
+            // Fetch or create user
             let user = await User.findOne({ discordId }).populate('cats.cat');
             if (!user) {
                 user = await User.create({
@@ -87,10 +74,9 @@ export default {
                 { type: 'Epic', chance: 0.04 },
                 { type: 'Legendary', chance: 0.01 }
             ];
-
             let rarity = 'Common';
-            const roll = Math.random();
             let cumulative = 0;
+            const roll = Math.random();
             for (const r of rarities) {
                 cumulative += r.chance;
                 if (roll < cumulative) {
@@ -99,26 +85,29 @@ export default {
                 }
             }
 
+            // Pick cat
             const catsOfRarity = await Cat.find({ rarity });
             const cat = catsOfRarity[Math.floor(Math.random() * catsOfRarity.length)];
 
-            // Add cat to collection
+            // Add cat to user's collection
             let existing = user.cats.find(c => c.cat && c.cat._id.equals(cat._id));
             if (existing) existing.quantity++;
             else user.cats.push({ cat: cat._id, model: 'Cat', quantity: 1 });
 
-            // Catnip gain
-            let catnipEarned = Math.floor(catnipRewards[rarity] * getCatnipMultiplier(user.level));
+            // Personality trait
+            const trait = rollPersonality();
+            if (trait) cat.personality = trait;
 
-            // Apply global event multiplier
+            // Catnip calculation
+            let catnipEarned = Math.floor(catnipRewards[rarity] * getCatnipMultiplier(user.level));
             const currentEvent = getCurrentEvent();
-            if (currentEvent?.catnipMultiplier) {
-                catnipEarned = Math.floor(catnipEarned * currentEvent.catnipMultiplier);
-            }
+            if (currentEvent?.catnipMultiplier) catnipEarned = Math.floor(catnipEarned * currentEvent.catnipMultiplier);
+            if (trait && (trait.type === 'catnip' || trait.type === 'both')) catnipEarned = Math.floor(catnipEarned * trait.multiplier);
             user.catnip += catnipEarned;
 
-            // XP gain
-            const xpEarned = xpRewards[rarity];
+            // XP calculation
+            let xpEarned = xpRewards[rarity];
+            if (trait && (trait.type === 'xp' || trait.type === 'both')) xpEarned = Math.floor(xpEarned * trait.multiplier);
             const leveledUp = addXP(user, xpEarned);
 
             await user.save();
@@ -126,30 +115,23 @@ export default {
 
             // Animation
             let frames = snowfallFrames(5, 30, 6);
-            if (currentEvent?.name === 'Snowstorm') {
-                frames = snowfallFrames(5, 30, 6, ['❄️']);
-            }
-
+            if (currentEvent?.name === 'Snowstorm') frames = snowfallFrames(5, 30, 6, ['❄️']);
             await animateEmbed(interaction, `🎄 ${username} discovers a cat...`, frames, rarityColors[rarity]);
 
-            // Final reveal
+            // Build embed
             const embed = new EmbedBuilder()
                 .setTitle(`🎄 You discovered a cat! ${rarityEmojis[rarity]}`)
                 .setColor(rarityColors[rarity])
                 .setDescription(
                     `**${cat.name}** — ${cat.description}\n\n` +
+                    (trait ? `🌟 Personality: **${trait.tierName} ${trait.name}**\n` : '') +
                     `🎁 Catnip Earned: **${catnipEarned}**\n` +
                     `⭐ XP Earned: **${xpEarned}**\n\n` +
-                    (leveledUp ? `🎉 **LEVEL UP!** You are now **Level ${user.level}**!\n` : ``) +
+                    (leveledUp ? `🎉 **LEVEL UP!** You are now **Level ${user.level}**!\n` : '') +
                     `💰 Total Catnip: **${user.catnip}**`
                 );
 
-            if (currentEvent) {
-                embed.addFields({
-                    name: '🌟 Current Event',
-                    value: `${currentEvent.name} — ${currentEvent.description}`
-                });
-            }
+            if (currentEvent) embed.addFields({ name: '🌟 Current Event', value: `${currentEvent.name} — ${currentEvent.description}` });
 
             await interaction.editReply({ embeds: [embed] });
 

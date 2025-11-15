@@ -5,8 +5,7 @@ import EventCat from '../models/EventCat.js';
 import { animateEmbed } from '../utils/animateEmbed.js';
 import { snowfallFrames } from '../utils/christmasUtils/snowfall.js';
 import { addXP } from '../utils/addXP.js';
-import { getCatnipMultiplier } from '../utils/levelTitles.js'; // ⬅ NEW
-
+import { rollPersonality } from '../utils/rollPersonality.js';
 
 const rarityColors = {
     Rare: '#3261CD',
@@ -21,16 +20,14 @@ const rarityEmojis = {
 };
 
 // XP rewards
-const xpRewards = {
-    Rare: 20,
-    Epic: 50,
-    Legendary: 100
-};
+const xpRewards = { Rare: 20, Epic: 50, Legendary: 100 };
 
+// Costs
 const SINGLE_COST = 20;
 const MULTI_COST = 200;
 const MULTI_COUNT = 11;
 
+// Rarity distribution
 const rarities = [
     { type: 'Rare', chance: 0.85 },
     { type: 'Epic', chance: 0.12 },
@@ -50,24 +47,17 @@ export default {
 
     async execute(interaction) {
         await interaction.deferReply();
-
-        const discordId = interaction.user.id;
-        const username = interaction.user.username;
+        const { id: discordId, username } = interaction.user;
 
         try {
+            // Fetch or create user
             let user = await User.findOne({ discordId }).populate('cats.cat');
-            if (!user)
-                user = await User.create({
-                    discordId,
-                    username,
-                    cats: [],
-                    catnip: 0,
-                    xp: 0,
-                    level: 1
-                });
+            if (!user) {
+                user = await User.create({ discordId, username, cats: [], catnip: 0, xp: 0, level: 1 });
+            }
 
-            // Menu
-            const embed = new EmbedBuilder()
+            // Menu embed
+            const menuEmbed = new EmbedBuilder()
                 .setTitle('🎁 Premium Event Discover')
                 .setDescription(
                     `🎯 **Single Pull:** 1 Rare+ Event Cat — **${SINGLE_COST} Catnip**\n` +
@@ -80,7 +70,7 @@ export default {
                 new ButtonBuilder().setCustomId('multi').setLabel('Multi Pull').setStyle(ButtonStyle.Success)
             );
 
-            const msg = await interaction.editReply({ embeds: [embed], components: [row] });
+            const msg = await interaction.editReply({ embeds: [menuEmbed], components: [row] });
             const collector = msg.createMessageComponentCollector({ time: 120000 });
 
             collector.on('collect', async i => {
@@ -90,47 +80,48 @@ export default {
                 const pullCount = i.customId === 'single' ? 1 : MULTI_COUNT;
                 const cost = i.customId === 'single' ? SINGLE_COST : MULTI_COST;
 
-                if (user.catnip < cost)
-                    return i.followUp({ content: `❌ Not enough Catnip! Need ${cost}.`, ephemeral: true });
+                if (user.catnip < cost) return i.followUp({ content: `❌ Not enough Catnip! Need ${cost}.`, ephemeral: true });
 
                 user.catnip -= cost;
                 await user.save();
-
                 await i.editReply({ components: [] });
 
                 const results = [];
                 let levelUps = 0;
 
                 for (let j = 0; j < pullCount; j++) {
+                    // Determine rarity
                     const roll = Math.random();
                     let rarity = 'Rare';
                     let cumulative = 0;
+                    for (const r of rarities) { cumulative += r.chance; if (roll < cumulative) { rarity = r.type; break; } }
 
-                    for (const r of rarities) {
-                        cumulative += r.chance;
-                        if (roll < cumulative) { rarity = r.type; break; }
-                    }
-
+                    // Pick cat
                     const pool = await EventCat.find({ eventRarity: eventRarityMap[rarity] });
                     const cat = pool[Math.floor(Math.random() * pool.length)];
 
-                    results.push({ cat, rarity });
+                    // Personality trait
+                    const trait = rollPersonality();
+                    if (trait) cat.personality = trait;
 
-                    // XP Logic
-                    const xpEarned = xpRewards[rarity];
-                    const leveledUp = addXP(user, xpEarned);
-                    if (leveledUp) levelUps++;
+                    // XP calculation
+                    let xpEarned = xpRewards[rarity];
+                    if (trait && (trait.type === 'xp' || trait.type === 'both')) xpEarned = Math.floor(xpEarned * trait.multiplier);
+                    if (addXP(user, xpEarned)) levelUps++;
 
-                    // Animation with mixed particles
+                    results.push({ cat, rarity, trait, xpEarned });
+
+                    // Animation
                     const frames = snowfallFrames(2, 25, 6, rarity);
                     await animateEmbed(i, `🎁 Pull ${j + 1}`, frames, rarityColors[rarity]);
-
 
                     await i.editReply({
                         embeds: [
                             new EmbedBuilder()
                                 .setTitle(`🎉 Pull ${j + 1}`)
-                                .setDescription(`${rarityEmojis[rarity]} **${cat.name}**\n⭐ XP Earned: **${xpEarned}**`)
+                                .setDescription(`${rarityEmojis[rarity]} **${cat.name}**` +
+                                    (trait ? `\n🌟 Personality: **${trait.tierName} ${trait.name}**` : '') +
+                                    `\n⭐ XP Earned: **${xpEarned}**`)
                                 .setColor(rarityColors[rarity])
                         ]
                     });
@@ -144,19 +135,18 @@ export default {
                     if (found) found.quantity++;
                     else user.cats.push({ cat: cat._id, model: 'EventCat', quantity: 1 });
                 }
-
                 await user.save();
 
-                const list = results
-                    .map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**`)
-                    .join('\n');
+                // Final summary embed
+                const list = results.map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**` +
+                    (r.trait ? ` — 🌟 ${r.trait.tierName} ${r.trait.name}` : '')).join('\n');
 
                 const finalEmbed = new EmbedBuilder()
                     .setTitle(`🎉 Premium Discover Results!`)
                     .setColor('#FFD700')
                     .setDescription(
                         `${list}\n\n` +
-                        (levelUps > 0 ? `🎉 **You leveled up ${levelUps} time(s)!** New Level: **${user.level}**\n\n` : ``) +
+                        (levelUps > 0 ? `🎉 **You leveled up ${levelUps} time(s)!** New Level: **${user.level}**\n\n` : '') +
                         `💰 Remaining Catnip: **${user.catnip}**`
                     );
 
