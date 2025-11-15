@@ -9,7 +9,7 @@ import mongoose from 'mongoose';
 import express from 'express'; // ✅ add Express
 
 //--------------------- In Project Imports -----------------------
-import { startDailyResetScheduler } from "./utils/dailyReset.js";
+import { scheduleDailyReset } from "./utils/dailyReset.js";
 
 // -------------------- Keep-alive Web Server --------------------
 const app = express();
@@ -39,7 +39,7 @@ for (const file of commandFiles) {
 
 client.once('clientReady', () => {
     console.log(`✅ Logged in as ${client.user.tag}`);
-    startDailyResetScheduler();
+    scheduleDailyReset();
 });
 
 client.on('interactionCreate', async (interaction) => {
