@@ -79,7 +79,7 @@ export default {
 
             // Pull selection embed
             const embed = new EmbedBuilder()
-                .setTitle('🎁 Premium Event Gacha')
+                .setTitle('🎁 Premium Event Discover')
                 .setDescription(
                     `Choose your premium pull:\n\n` +
                     `🎯 **Single Pull:** 1 Rare+ Event Cat for **${SINGLE_COST} Catnip**\n` +
@@ -97,7 +97,7 @@ export default {
             const collector = message.createMessageComponentCollector({ time: 120000 });
 
             collector.on('collect', async i => {
-                if (i.user.id !== discordId) return i.reply({ content: 'This is not your gacha!', ephemeral: true });
+                if (i.user.id !== discordId) return i.reply({ content: 'This is not your discover!', ephemeral: true });
                 await i.deferUpdate();
 
                 const pullCount = i.customId === 'single' ? 1 : MULTI_COUNT;
@@ -170,7 +170,7 @@ export default {
                 // Final results list
                 const descriptionList = results.map(r => `${rarityEmojis[r.rarity]} **${r.cat.name}**`).join('\n');
                 const finalEmbed = new EmbedBuilder()
-                    .setTitle(`🎉 Premium Gacha Results!`)
+                    .setTitle(`🎉 Premium Discover Results!`)
                     .setDescription(descriptionList + `\n\n💰 Remaining Catnip: ${user.catnip}`)
                     .setColor('#FFD700');
 
