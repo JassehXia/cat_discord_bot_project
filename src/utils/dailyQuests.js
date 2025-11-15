@@ -4,7 +4,7 @@ export const dailyQuests = [
     { key: "earn_100_catnip", name: "Get 100 Catnip", target: 100, field: "dailyCatnip", reward: { catnip: 100, xp: 100 } }
 ];
 
-export function getRandomQuests(amount = 2) {
+export function getRandomQuests(amount) {
     const pool = [...dailyQuests];
     const selected = [];
 

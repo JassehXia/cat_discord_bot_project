@@ -54,7 +54,7 @@ export default {
         // RESET OR ASSIGN NEW QUESTS
         // -----------------------------
         if (needsReset) {
-            const fresh = getRandomQuests(2);
+            const fresh = getRandomQuests(3);
             user.dailyQuests = fresh.map(q => ({
                 ...q,
                 progress: 0,
